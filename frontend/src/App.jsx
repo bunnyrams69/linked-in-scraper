@@ -487,30 +487,54 @@ function App() {
   const handleLoadMockData = () => {
     setExportResult(null);
     const mockHeaders = [
-      'firstName', 'lastName', 'fullName', 'jobTitle', 'companyName', 
-      'location', 'profileUrl', 'companyUrl', 'industry', 'companySize',
-      'profileurl', 'fullname', 'firstname', 'lastname', 'companyname', 
-      'title', 'companyid', 'companyurl', 'reguralcompany', 'summary', 
-      'titlediscription', 'industry', 'companylocation', 'location', 
-      'durationrole', 'durationcompany'
+      'profileUrl',
+      'firstName',
+      'lastName',
+      'fullName',
+      'jobTitle',
+      'companyName',
+      'location',
+      'companyUrl',
+      'industry',
+      'companySize',
+      'companylocation',
+      'summary',
+      'titlediscription',
+      'email'
     ];
     
     const mockRows = [
       [
-        'John', 'Doe', 'John Doe', 'Senior Software Engineer', 'Google',
-        'San Francisco, CA', 'https://linkedin.com/in/johndoe', 'https://linkedin.com/company/google', 'Technology', '10,000+',
-        'https://linkedin.com/in/johndoe', 'John Doe', 'John', 'Doe', 'Google',
-        'Senior Software Engineer', 'google', 'https://linkedin.com/company/google', 'true', 'Experienced backend engineer specializing in cloud systems.',
-        'Building scalable search APIs and indexing architecture.', 'Technology', 'Mountain View, CA', 'San Francisco, CA',
-        '3 years 2 months', '5 years'
+        'https://linkedin.com/in/johndoe',
+        'John',
+        'Doe',
+        'John Doe',
+        'Senior Software Engineer',
+        'Google',
+        'San Francisco, CA',
+        'https://linkedin.com/company/google',
+        'Technology',
+        '10,000+',
+        'Mountain View, CA',
+        'Experienced backend engineer specializing in cloud systems.',
+        'Building scalable search APIs and indexing architecture.',
+        'john.doe@gmail.com'
       ],
       [
-        'Jane', 'Smith', 'Jane Smith', 'Product Manager', 'Stripe',
-        'New York, NY', 'https://linkedin.com/in/janesmith', 'https://linkedin.com/company/stripe', 'Financial Services', '5001-10000',
-        'https://linkedin.com/in/janesmith', 'Jane Smith', 'Jane', 'Smith', 'Stripe',
-        'Product Manager', 'stripe', 'https://linkedin.com/company/stripe', 'true', 'Passionate about crafting simple APIs for complex financial tasks.',
-        'Leading billing infrastructure expansion in European markets.', 'Financial Services', 'Dublin, Ireland', 'New York, NY',
-        '1 year 6 months', '1 year 6 months'
+        'https://linkedin.com/in/janesmith',
+        'Jane',
+        'Smith',
+        'Jane Smith',
+        'Product Manager',
+        'Stripe',
+        'New York, NY',
+        'https://linkedin.com/company/stripe',
+        'Financial Services',
+        '5001-10000',
+        'Dublin, Ireland',
+        'Passionate about crafting simple APIs for complex financial tasks.',
+        'Leading billing infrastructure expansion in European markets.',
+        'jane.smith@stripe.com'
       ]
     ];
 

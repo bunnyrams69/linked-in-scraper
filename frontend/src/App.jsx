@@ -862,6 +862,16 @@ function App() {
                         </button>
                       )}
                     </div>
+                    {!serviceAccountJson && (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginTop: '0.25rem' }}>
+                        Tip: Paste your Service Account JSON above to load spreadsheets from your Google Drive automatically.
+                      </span>
+                    )}
+                    {serviceAccountJson && spreadsheets.length === 0 && !isLoadingSpreadsheets && (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginTop: '0.25rem' }}>
+                        If your spreadsheets are not loading, make sure the Service Account has been shared with them.
+                      </span>
+                    )}
                     {manualSpreadsheetMode && spreadsheets.length > 0 && (
                       <span 
                         onClick={() => {
@@ -933,6 +943,11 @@ function App() {
                         </button>
                       )}
                     </div>
+                    {!spreadsheetId && (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginTop: '0.25rem' }}>
+                        Provide a Spreadsheet ID above to query existing tabs.
+                      </span>
+                    )}
                     {manualSheetMode && sheetTabs.length > 0 && (
                       <span 
                         onClick={() => {

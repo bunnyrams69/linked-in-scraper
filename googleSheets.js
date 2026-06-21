@@ -154,6 +154,33 @@ async function exportToServiceAccount(credentials, spreadsheetId, sheetName, { h
     );
 
     const sheets = google.sheets({ version: 'v4', auth });
+
+    // Verify if the sheet tab exists, and if not, create it
+    if (sheetName) {
+      try {
+        const ssMeta = await sheets.spreadsheets.get({ spreadsheetId });
+        const sheetExists = ssMeta.data.sheets.some(s => s.properties.title === sheetName);
+        if (!sheetExists) {
+          await sheets.spreadsheets.batchUpdate({
+            spreadsheetId,
+            requestBody: {
+              requests: [
+                {
+                  addSheet: {
+                    properties: {
+                      title: sheetName
+                    }
+                  }
+                }
+              ]
+            }
+          });
+        }
+      } catch (e) {
+        throw new Error(`Failed to check or create sheet tab "${sheetName}": ${e.message}`);
+      }
+    }
+
     const rangeName = sheetName ? `${sheetName}!A1` : 'A1';
 
     // Check if sheet has headers
@@ -165,7 +192,7 @@ async function exportToServiceAccount(credentials, spreadsheetId, sheetName, { h
       });
       hasHeaders = !!(checkRes.data.values && checkRes.data.values.length > 0);
     } catch (e) {
-      // If the sheet doesn't exist, we'll try to let sheets API create it or write it
+      // Range check failed or sheet was just created empty
     }
 
     const payload = [];

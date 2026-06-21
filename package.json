@@ -1,0 +1,22 @@
+{
+  "name": "linkedin-scraper-exporter",
+  "version": "1.0.0",
+  "description": "Backend server and client runner for LinkedIn Apify Scraper and Google Sheets exporter",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "build:frontend": "cd frontend && npm install && npm run build",
+    "install:all": "npm install && cd frontend && npm install"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "googleapis": "^144.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}

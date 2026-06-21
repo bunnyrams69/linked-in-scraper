@@ -40,6 +40,14 @@ function App() {
   const [serviceAccountJson, setServiceAccountJson] = useState(() => localStorage.getItem('serviceAccountJson') || '');
   const [sheetName, setSheetName] = useState('Sheet1');
 
+  // Spreadsheet selector states
+  const [spreadsheets, setSpreadsheets] = useState([]);
+  const [sheetTabs, setSheetTabs] = useState([]);
+  const [isLoadingSpreadsheets, setIsLoadingSpreadsheets] = useState(false);
+  const [isLoadingTabs, setIsLoadingTabs] = useState(false);
+  const [manualSpreadsheetMode, setManualSpreadsheetMode] = useState(false);
+  const [manualSheetMode, setManualSheetMode] = useState(false);
+
   // Apps Script snippet
   const [appsScriptSnippet, setAppsScriptSnippet] = useState('');
   const [copied, setCopied] = useState(false);
@@ -86,6 +94,124 @@ function App() {
       })
       .catch(err => console.error('Failed to load Apps Script snippet', err));
   }, []);
+
+  const handleFetchSpreadsheets = async (creds = serviceAccountJson) => {
+    if (!creds) return;
+    try {
+      JSON.parse(creds);
+    } catch (e) {
+      // Ignore if user is still typing and JSON is not yet valid
+      return;
+    }
+    
+    setIsLoadingSpreadsheets(true);
+    setSpreadsheets([]);
+    addLog('Fetching spreadsheets shared with the Service Account...', 'info');
+    try {
+      const response = await fetch(`${API_BASE}/api/google/spreadsheets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credentials: creds })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || data.details || 'Failed to list spreadsheets');
+      
+      setSpreadsheets(data.spreadsheets || []);
+      addLog(`Successfully loaded ${data.spreadsheets?.length || 0} spreadsheets.`, 'success');
+      
+      if (data.spreadsheets && data.spreadsheets.length > 0) {
+        // If current spreadsheetId is empty or not in the list, set the first spreadsheet
+        const found = data.spreadsheets.find(s => s.id === spreadsheetId);
+        if (!found && !spreadsheetId) {
+          setSpreadsheetId(data.spreadsheets[0].id);
+        }
+      }
+    } catch (err) {
+      addLog(`Failed to fetch spreadsheets: ${err.message}`, 'error');
+    } finally {
+      setIsLoadingSpreadsheets(false);
+    }
+  };
+
+  const handleFetchTabs = async (currentSpreadsheetId = spreadsheetId) => {
+    if (googleMethod === 'service-account') {
+      if (!serviceAccountJson || !currentSpreadsheetId) return;
+      try {
+        JSON.parse(serviceAccountJson);
+      } catch (e) {
+        return; // Ignore invalid service account JSON
+      }
+      setIsLoadingTabs(true);
+      setSheetTabs([]);
+      addLog(`Fetching sheet tabs for spreadsheet ID: ${currentSpreadsheetId}...`, 'info');
+      try {
+        const response = await fetch(`${API_BASE}/api/google/sheets`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credentials: serviceAccountJson, spreadsheetId: currentSpreadsheetId })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || data.details || 'Failed to list sheet tabs');
+        
+        setSheetTabs(data.sheets || []);
+        addLog(`Successfully loaded ${data.sheets?.length || 0} sheet tabs.`, 'success');
+        
+        if (data.sheets && data.sheets.length > 0) {
+          if (!data.sheets.includes(sheetName)) {
+            setSheetName(data.sheets[0]);
+          }
+        }
+      } catch (err) {
+        addLog(`Failed to load sheet tabs: ${err.message}`, 'error');
+      } finally {
+        setIsLoadingTabs(false);
+      }
+    } else if (googleMethod === 'apps-script') {
+      if (!appsScriptUrl) {
+        addLog('Please enter the Apps Script Web App URL first.', 'warn');
+        return;
+      }
+      setIsLoadingTabs(true);
+      setSheetTabs([]);
+      addLog('Fetching tabs from Google Sheet via Apps Script...', 'info');
+      try {
+        const response = await fetch(`${API_BASE}/api/google/apps-script/sheets`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: appsScriptUrl, spreadsheetId })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || data.details || 'Failed to list sheet tabs');
+        
+        setSheetTabs(data.sheets || []);
+        addLog(`Successfully loaded ${data.sheets?.length || 0} sheet tabs via Apps Script.`, 'success');
+        
+        if (data.sheets && data.sheets.length > 0) {
+          if (!data.sheets.includes(sheetName)) {
+            setSheetName(data.sheets[0]);
+          }
+        }
+      } catch (err) {
+        addLog(`Failed to load sheet tabs: ${err.message}. Make sure your Apps Script is deployed with getSheets capability.`, 'error');
+      } finally {
+        setIsLoadingTabs(false);
+      }
+    }
+  };
+
+  // Auto-fetch spreadsheets when Service Account JSON is updated
+  useEffect(() => {
+    if (googleMethod === 'service-account' && serviceAccountJson) {
+      handleFetchSpreadsheets();
+    }
+  }, [googleMethod, serviceAccountJson]);
+
+  // Auto-fetch tabs when Spreadsheet ID changes under Service Account
+  useEffect(() => {
+    if (googleMethod === 'service-account' && serviceAccountJson && spreadsheetId) {
+      handleFetchTabs(spreadsheetId);
+    }
+  }, [googleMethod, spreadsheetId]);
 
   // Auto-scroll logs to bottom
   useEffect(() => {
@@ -580,14 +706,76 @@ function App() {
                   onChange={(e) => setSpreadsheetId(e.target.value)}
                 />
               </div>
+              
               <div className="form-group">
                 <label>Sheet Name / Tab Name <span className="tag-optional">(Optional)</span></label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Sheet1 (Defaults to active tab)"
-                  value={sheetName}
-                  onChange={(e) => setSheetName(e.target.value)}
-                />
+                {sheetTabs.length > 0 && !manualSheetMode ? (
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <select
+                      value={sheetName}
+                      onChange={(e) => {
+                        if (e.target.value === '__NEW__') {
+                          setManualSheetMode(true);
+                          setSheetName('');
+                        } else {
+                          setSheetName(e.target.value);
+                        }
+                      }}
+                      style={{ flex: 1, padding: '0.6rem 0.8rem', background: 'rgba(10, 15, 26, 0.8)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff' }}
+                    >
+                      {sheetTabs.map((tab, idx) => (
+                        <option key={idx} value={tab}>{tab}</option>
+                      ))}
+                      <option value="__NEW__">+ Create a new tab...</option>
+                    </select>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => handleFetchTabs()}
+                      disabled={isLoadingTabs}
+                      style={{ padding: '0 0.75rem', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. Sheet1 (Defaults to active tab)"
+                        value={sheetName}
+                        onChange={(e) => setSheetName(e.target.value)}
+                        style={{ flex: 1 }}
+                      />
+                      {appsScriptUrl && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => {
+                            setManualSheetMode(false);
+                            handleFetchTabs();
+                          }}
+                          disabled={isLoadingTabs}
+                          style={{ padding: '0 0.75rem', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+                        >
+                          {isLoadingTabs ? 'Loading...' : 'Load Tabs'}
+                        </button>
+                      )}
+                    </div>
+                    {manualSheetMode && sheetTabs.length > 0 && (
+                      <span 
+                        onClick={() => {
+                          setManualSheetMode(false);
+                          if (sheetTabs.length > 0) setSheetName(sheetTabs[0]);
+                        }} 
+                        style={{ fontSize: '0.75rem', color: 'var(--color-primary)', cursor: 'pointer', display: 'block', marginTop: '0.25rem', textDecoration: 'underline' }}
+                      >
+                        Select from existing tabs
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {appsScriptSnippet && (
@@ -605,25 +793,7 @@ function App() {
           ) : (
             <div>
               <div className="alert alert-info">
-                <strong>How to connect:</strong> Create a Google Cloud Project, enable the Sheets API, and create a Service Account. Share the Google Sheet with your Service Account email (with Editor permissions).
-              </div>
-              <div className="form-group">
-                <label>Google Spreadsheet ID <span className="required">*</span></label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. 1a2b3c4d5e6f7g8h9i0j..."
-                  value={spreadsheetId}
-                  onChange={(e) => setSpreadsheetId(e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label>Sheet Name (Tab Name)</label>
-                <input 
-                  type="text" 
-                  placeholder="Sheet1"
-                  value={sheetName}
-                  onChange={(e) => setSheetName(e.target.value)}
-                />
+                <strong>How to connect:</strong> Create a Google Cloud Project, enable the Sheets and Drive APIs, and create a Service Account. Share the target Google Sheet with your Service Account email (with Editor permissions).
               </div>
               <div className="form-group">
                 <label>Service Account JSON Credentials File <span className="required">*</span></label>
@@ -631,8 +801,151 @@ function App() {
                   placeholder='Paste service_account.json contents here...'
                   value={serviceAccountJson}
                   onChange={(e) => setServiceAccountJson(e.target.value)}
-                  style={{ height: '140px' }}
+                  style={{ height: '100px' }}
                 />
+              </div>
+
+              <div className="form-group">
+                <label>Select Google Spreadsheet <span className="required">*</span></label>
+                {spreadsheets.length > 0 && !manualSpreadsheetMode ? (
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <select
+                      value={spreadsheetId}
+                      onChange={(e) => {
+                        if (e.target.value === '__MANUAL__') {
+                          setManualSpreadsheetMode(true);
+                          setSpreadsheetId('');
+                        } else {
+                          setSpreadsheetId(e.target.value);
+                        }
+                      }}
+                      style={{ flex: 1, padding: '0.6rem 0.8rem', background: 'rgba(10, 15, 26, 0.8)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff' }}
+                    >
+                      <option value="">--- Select Spreadsheet ---</option>
+                      {spreadsheets.map((ss) => (
+                        <option key={ss.id} value={ss.id}>{ss.name}</option>
+                      ))}
+                      <option value="__MANUAL__">[Enter Spreadsheet ID manually]</option>
+                    </select>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => handleFetchSpreadsheets()}
+                      disabled={isLoadingSpreadsheets}
+                      style={{ padding: '0 0.75rem', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+                    >
+                      {isLoadingSpreadsheets ? '...' : 'Refresh'}
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. 1a2b3c4d5e6f7g8h9i0j..."
+                        value={spreadsheetId}
+                        onChange={(e) => setSpreadsheetId(e.target.value)}
+                        style={{ flex: 1 }}
+                      />
+                      {serviceAccountJson && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => {
+                            setManualSpreadsheetMode(false);
+                            handleFetchSpreadsheets();
+                          }}
+                          disabled={isLoadingSpreadsheets}
+                          style={{ padding: '0 0.75rem', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+                        >
+                          {isLoadingSpreadsheets ? 'Loading...' : 'Load Spreadsheets'}
+                        </button>
+                      )}
+                    </div>
+                    {manualSpreadsheetMode && spreadsheets.length > 0 && (
+                      <span 
+                        onClick={() => {
+                          setManualSpreadsheetMode(false);
+                          if (spreadsheets.length > 0) setSpreadsheetId(spreadsheets[0].id);
+                        }} 
+                        style={{ fontSize: '0.75rem', color: 'var(--color-primary)', cursor: 'pointer', display: 'block', marginTop: '0.25rem', textDecoration: 'underline' }}
+                      >
+                        Select from shared spreadsheets
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label>Select Sheet Tab Name <span className="tag-optional">(Optional)</span></label>
+                {sheetTabs.length > 0 && !manualSheetMode ? (
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <select
+                      value={sheetName}
+                      onChange={(e) => {
+                        if (e.target.value === '__NEW__') {
+                          setManualSheetMode(true);
+                          setSheetName('');
+                        } else {
+                          setSheetName(e.target.value);
+                        }
+                      }}
+                      style={{ flex: 1, padding: '0.6rem 0.8rem', background: 'rgba(10, 15, 26, 0.8)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff' }}
+                    >
+                      {sheetTabs.map((tab, idx) => (
+                        <option key={idx} value={tab}>{tab}</option>
+                      ))}
+                      <option value="__NEW__">+ Create a new tab...</option>
+                    </select>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => handleFetchTabs()}
+                      disabled={isLoadingTabs}
+                      style={{ padding: '0 0.75rem', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input 
+                        type="text" 
+                        placeholder="Sheet1"
+                        value={sheetName}
+                        onChange={(e) => setSheetName(e.target.value)}
+                        style={{ flex: 1 }}
+                      />
+                      {spreadsheetId && serviceAccountJson && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => {
+                            setManualSheetMode(false);
+                            handleFetchTabs();
+                          }}
+                          disabled={isLoadingTabs}
+                          style={{ padding: '0 0.75rem', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+                        >
+                          {isLoadingTabs ? 'Loading...' : 'Load Tabs'}
+                        </button>
+                      )}
+                    </div>
+                    {manualSheetMode && sheetTabs.length > 0 && (
+                      <span 
+                        onClick={() => {
+                          setManualSheetMode(false);
+                          if (sheetTabs.length > 0) setSheetName(sheetTabs[0]);
+                        }} 
+                        style={{ fontSize: '0.75rem', color: 'var(--color-primary)', cursor: 'pointer', display: 'block', marginTop: '0.25rem', textDecoration: 'underline' }}
+                      >
+                        Select from existing tabs
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}

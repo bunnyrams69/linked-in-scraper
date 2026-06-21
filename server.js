@@ -2,7 +2,14 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const axios = require('axios');
-const { APPS_SCRIPT_SNIPPET, exportToAppsScript, exportToServiceAccount } = require('./googleSheets');
+const { 
+  APPS_SCRIPT_SNIPPET, 
+  exportToAppsScript, 
+  exportToServiceAccount,
+  listSpreadsheets,
+  listSpreadsheetSheets,
+  listAppsScriptSheets
+} = require('./googleSheets');
 const { formatForGoogleSheets } = require('./parser');
 
 const app = express();
@@ -145,6 +152,56 @@ app.get('/api/scrape/dataset/:datasetId', async (req, res) => {
       error: 'Failed to retrieve dataset items',
       details: error.response?.data?.error?.message || error.message
     });
+  }
+});
+
+// 4.1. List Spreadsheets (Service Account)
+app.post('/api/google/spreadsheets', async (req, res) => {
+  const { credentials } = req.body;
+  if (!credentials) {
+    return res.status(400).json({ error: 'Missing Service Account credentials' });
+  }
+
+  try {
+    const parsedCreds = typeof credentials === 'string' ? JSON.parse(credentials) : credentials;
+    const list = await listSpreadsheets(parsedCreds);
+    res.json({ success: true, spreadsheets: list });
+  } catch (error) {
+    console.error('Error listing spreadsheets:', error.message);
+    res.status(500).json({ error: 'Failed to list spreadsheets', details: error.message });
+  }
+});
+
+// 4.2. List Sheet Tabs (Service Account)
+app.post('/api/google/sheets', async (req, res) => {
+  const { credentials, spreadsheetId } = req.body;
+  if (!credentials || !spreadsheetId) {
+    return res.status(400).json({ error: 'Missing credentials or spreadsheetId' });
+  }
+
+  try {
+    const parsedCreds = typeof credentials === 'string' ? JSON.parse(credentials) : credentials;
+    const list = await listSpreadsheetSheets(parsedCreds, spreadsheetId);
+    res.json({ success: true, sheets: list });
+  } catch (error) {
+    console.error('Error listing spreadsheet tabs:', error.message);
+    res.status(500).json({ error: 'Failed to retrieve spreadsheet tabs', details: error.message });
+  }
+});
+
+// 4.3. List Sheet Tabs (Apps Script Web App)
+app.post('/api/google/apps-script/sheets', async (req, res) => {
+  const { url, spreadsheetId } = req.body;
+  if (!url) {
+    return res.status(400).json({ error: 'Missing Apps Script Web App URL' });
+  }
+
+  try {
+    const list = await listAppsScriptSheets(url, spreadsheetId);
+    res.json({ success: true, sheets: list });
+  } catch (error) {
+    console.error('Error listing tabs via Apps Script:', error.message);
+    res.status(500).json({ error: 'Failed to retrieve tabs via Apps Script', details: error.message });
   }
 });
 

@@ -7,7 +7,12 @@ const axios = require('axios');
 const APPS_SCRIPT_SNIPPET = `function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var ss = data.spreadsheetId ? SpreadsheetApp.openById(data.spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = data.sheetName ? ss.getSheetByName(data.sheetName) : ss.getActiveSheet();
+    
+    if (!sheet && data.sheetName) {
+      sheet = ss.insertSheet(data.sheetName);
+    }
     
     // Write headers if the sheet is empty
     if (sheet.getLastRow() === 0) {
@@ -30,9 +35,9 @@ const APPS_SCRIPT_SNIPPET = `function doPost(e) {
 /**
  * Exports data to Google Sheets using a Google Apps Script Web App URL.
  */
-async function exportToAppsScript(url, { headers, rows }) {
+async function exportToAppsScript(url, { headers, rows, spreadsheetId, sheetName }) {
   try {
-    const response = await axios.post(url, { headers, rows }, {
+    const response = await axios.post(url, { headers, rows, spreadsheetId, sheetName }, {
       headers: {
         'Content-Type': 'application/json'
       }

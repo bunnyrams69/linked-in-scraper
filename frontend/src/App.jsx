@@ -413,7 +413,11 @@ function App() {
         setIsExporting(false);
         return;
       }
-      config = { url: appsScriptUrl.trim() };
+      config = { 
+        url: appsScriptUrl.trim(),
+        spreadsheetId: spreadsheetId.trim(),
+        sheetName: sheetName.trim()
+      };
     } else {
       if (!spreadsheetId || !serviceAccountJson) {
         addLog('Error: Spreadsheet ID and Service Account JSON credentials are required.', 'error');
@@ -564,6 +568,25 @@ function App() {
                   placeholder="https://script.google.com/macros/s/.../exec"
                   value={appsScriptUrl}
                   onChange={(e) => setAppsScriptUrl(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Google Spreadsheet ID <span className="tag-optional">(Optional)</span></label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. 1a2b3c4d5e... (Defaults to bound sheet)"
+                  value={spreadsheetId}
+                  onChange={(e) => setSpreadsheetId(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label>Sheet Name / Tab Name <span className="tag-optional">(Optional)</span></label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Sheet1 (Defaults to active tab)"
+                  value={sheetName}
+                  onChange={(e) => setSheetName(e.target.value)}
                 />
               </div>
 

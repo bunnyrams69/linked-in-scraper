@@ -158,12 +158,17 @@ app.post('/api/export', async (req, res) => {
 
   try {
     if (method === 'apps-script') {
-      const { url } = config;
+      const { url, spreadsheetId, sheetName } = config;
       if (!url) {
         return res.status(400).json({ error: 'Missing Apps Script Web App URL' });
       }
 
-      const result = await exportToAppsScript(url, data);
+      const result = await exportToAppsScript(url, {
+        headers: data.headers,
+        rows: data.rows,
+        spreadsheetId,
+        sheetName
+      });
       return res.json({ success: true, count: result.count });
 
     } else if (method === 'service-account') {

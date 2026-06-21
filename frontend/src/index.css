@@ -171,6 +171,13 @@ h2.section-title span.badge {
   margin-left: 0.25rem;
 }
 
+.form-group label span.tag-optional {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  margin-left: 0.25rem;
+  opacity: 0.7;
+}
+
 .form-group input, .form-group textarea, .form-group select {
   width: 100%;
   background: rgba(10, 15, 26, 0.8);
